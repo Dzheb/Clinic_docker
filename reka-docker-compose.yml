@@ -1,0 +1,88 @@
+version: '3.8'
+services:
+#  command: >
+#    bash -c "https://github.com/Dzheb/Reka.git ./Reka
+#    && chown -R www-data:www-data ./Reka
+#    && chmod -R 777 ./Reka
+#services:
+  # PHP-FPM service
+  app:
+    build:
+      context: ./php
+    container_name: reka_cont
+    image: reka
+    deploy:
+      replicas: 1
+#      update_config:
+#        parallelism: 1
+#        delay: 10s
+      restart_policy:
+        condition: on-failure
+#    restart: on-failure
+    volumes:
+#      - reka-backend:/app/
+      - ./Reka-docker:/var/www/html
+    working_dir: /var/www/html
+    networks:
+      - reka-net
+
+  # Nginx service
+  webserver:
+    image: nginx:alpine
+    container_name: nginx-webserver
+    deploy:
+      replicas: 1
+#      update_config:
+#        parallelism: 1
+#        delay: 10s
+      restart_policy:
+        condition: on-failure
+#    restart: on-failure
+    ports:
+      - "80:80"
+      - "443:443"
+    secrets:
+      - source: clinic-ssl-key
+        target: /etc/ssl/private/selfsigned.key
+        mode: 0400  # Ограничение прав доступа к ключу
+      - source: clinic-ssl-cert
+        target: /etc/ssl/certs/selfsigned.crt
+        mode: 0444  # Ограничение прав доступа к сертификату
+
+    volumes:
+ #     - reka-backend:/app/
+      - ./Reka-docker:/var/www/html
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+ #     - /etc/ssl/certs:/etc/ssl/certs
+ #     - /etc/ssl/private:/etc/ssl/private
+   # working_dir: /var/www/html/public
+#    depends_on:
+#      - app
+    networks:
+      - reka-net
+
+  # MySQL service (optional)
+  db:
+    image: mysql:5.7
+    container_name: db
+    restart: on-failure
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: reka
+    volumes:
+      - ./dbdata:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    networks:
+      - reka-net
+
+secrets:
+  clinic-ssl-key:
+    external: true
+  clinic-ssl-cert:
+    external: true
+
+networks:
+   reka-net:
+#  laravel-network:
+#    driver: overlay
